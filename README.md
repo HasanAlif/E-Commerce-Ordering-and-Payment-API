@@ -124,9 +124,6 @@ docker compose up --build
 
 Brings up **api** (multi-stage image; entrypoint runs `prisma migrate deploy` then `node dist/server.js`), **postgres:16** (host port **5433**), and **redis:7**, with healthchecks and named volumes. Seed from the host:
 
-```bash
-DATABASE_URL=postgresql://postgres:postgres@localhost:5433/ecommerce?schema=public npx prisma db seed
-```
 
 ## 8. Scripts
 

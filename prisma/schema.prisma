@@ -1,0 +1,200 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  ADMIN
+  CUSTOMER
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPEND
+  BLOCKED
+}
+
+enum AuthProvider {
+  LOCAL
+  GOOGLE
+}
+
+enum ProductStatus {
+  active
+  inactive
+}
+
+enum OrderStatus {
+  pending
+  paid
+  canceled
+}
+
+enum PaymentProvider {
+  stripe
+  bkash
+}
+
+enum PaymentStatus {
+  pending
+  success
+  failed
+}
+
+model User {
+  id String @id @default(uuid())
+
+  fullName       String  @db.VarChar(100)
+  email          String  @unique @db.VarChar(255)
+  mobileNumber   String? @db.VarChar(20)
+  password       String? @db.VarChar(255)
+  profilePicture String? @db.VarChar(500)
+
+  role         UserRole     @default(CUSTOMER)
+  status       UserStatus   @default(ACTIVE)
+  authProvider AuthProvider @default(LOCAL)
+
+  isDeleted  Boolean @default(false)
+  isVerified Boolean @default(false)
+
+  verificationOtp        String?   @db.VarChar(10)
+  verificationOtpExpiry  DateTime?
+  resetPasswordOtp       String?   @db.VarChar(10)
+  resetPasswordOtpExpiry DateTime?
+
+  googleId String? @db.VarChar(255)
+
+  orders Order[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([role], name: "idx_user_role")
+  @@index([status], name: "idx_user_status")
+  @@index([mobileNumber], name: "idx_user_mobile")
+  @@index([googleId], name: "idx_user_google_id")
+  @@index([isDeleted], name: "idx_user_is_deleted")
+  @@map("users")
+}
+
+model Category {
+  id String @id @default(uuid())
+
+  name        String  @db.VarChar(255)
+  slug        String  @unique @db.VarChar(255)
+  description String? @db.Text
+
+  parentId String?    @map("parent_id")
+  parent   Category?  @relation("CategoryChildren", fields: [parentId], references: [id], onDelete: SetNull)
+  children Category[] @relation("CategoryChildren")
+
+  products Product[]
+
+  isDeleted Boolean   @default(false) @map("is_deleted")
+  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@index([parentId], name: "idx_category_parent")
+  @@index([isDeleted], name: "idx_category_is_deleted")
+  @@map("categories")
+}
+
+model Product {
+  id String @id @default(uuid())
+
+  name        String  @db.VarChar(255)
+  sku         String  @unique @db.VarChar(100)
+  description String? @db.Text
+
+  price Int
+  stock Int @default(0)
+
+  status ProductStatus @default(active)
+
+  categoryId String   @map("category_id")
+  category   Category @relation(fields: [categoryId], references: [id])
+
+  orderItems OrderItem[]
+
+  isDeleted Boolean   @default(false) @map("is_deleted")
+  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@index([categoryId], name: "idx_product_category")
+  @@index([status], name: "idx_product_status")
+  @@index([isDeleted], name: "idx_product_is_deleted")
+  @@index([name], name: "idx_product_name")
+  @@map("products")
+}
+
+model Order {
+  id String @id @default(uuid())
+
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id])
+
+  totalAmount Int    @map("total_amount")
+  currency    String @db.VarChar(10)
+
+  status OrderStatus @default(pending)
+
+  items    OrderItem[]
+  payments Payment[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([userId], name: "idx_order_user")
+  @@index([status], name: "idx_order_status")
+  @@index([createdAt], name: "idx_order_created_at")
+  @@map("orders")
+}
+
+model OrderItem {
+  id String @id @default(uuid())
+
+  orderId String @map("order_id")
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  productId String  @map("product_id")
+  product   Product @relation(fields: [productId], references: [id])
+
+  quantity Int
+  price    Int
+  subtotal Int
+
+  @@unique([orderId, productId])
+  @@index([orderId], name: "idx_order_item_order")
+  @@index([productId], name: "idx_order_item_product")
+  @@map("order_items")
+}
+
+model Payment {
+  id String @id @default(uuid())
+
+  orderId String @map("order_id")
+  order   Order  @relation(fields: [orderId], references: [id])
+
+  provider PaymentProvider
+
+  transactionId String @unique @map("transaction_id") @db.VarChar(255)
+
+  status PaymentStatus @default(pending)
+
+  rawResponse Json? @map("raw_response")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([orderId], name: "idx_payment_order")
+  @@index([provider], name: "idx_payment_provider")
+  @@index([status], name: "idx_payment_status")
+  @@map("payments")
+}
